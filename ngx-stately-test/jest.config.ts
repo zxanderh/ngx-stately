@@ -1,8 +1,8 @@
 export default {
-  displayName: 'ngx-stately',
-  preset: '../../jest.preset.js',
+  displayName: 'ngx-stately-test',
+  preset: '../jest.preset.js',
   setupFilesAfterEnv: ['<rootDir>/src/test-setup.ts'],
-  coverageDirectory: '../../coverage/apps/ngx-stately',
+  coverageDirectory: '../coverage/ngx-stately-test',
   transform: {
     '^.+\\.(ts|mjs|js|html)$': [
       'jest-preset-angular',

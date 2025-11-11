@@ -1,27 +1,27 @@
 {
-  "name": "ngx-stately",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "name": "ngx-stately-test",
+  "$schema": "../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "prefix": "app",
-  "sourceRoot": "apps/ngx-stately/src",
+  "sourceRoot": "ngx-stately-test/src",
   "tags": [],
   "targets": {
     "build": {
       "executor": "@angular/build:application",
       "outputs": ["{options.outputPath}"],
       "options": {
-        "outputPath": "dist/apps/ngx-stately",
-        "browser": "apps/ngx-stately/src/main.ts",
+        "outputPath": "dist/ngx-stately-test",
+        "browser": "ngx-stately-test/src/main.ts",
         "polyfills": ["zone.js"],
-        "tsConfig": "apps/ngx-stately/tsconfig.app.json",
+        "tsConfig": "ngx-stately-test/tsconfig.app.json",
         "inlineStyleLanguage": "scss",
         "assets": [
           {
             "glob": "**/*",
-            "input": "apps/ngx-stately/public"
+            "input": "ngx-stately-test/public"
           }
         ],
-        "styles": ["apps/ngx-stately/src/styles.scss"]
+        "styles": ["ngx-stately-test/src/styles.scss"]
       },
       "configurations": {
         "production": {
@@ -52,10 +52,10 @@
       "executor": "@angular/build:dev-server",
       "configurations": {
         "production": {
-          "buildTarget": "ngx-stately:build:production"
+          "buildTarget": "ngx-stately-test:build:production"
         },
         "development": {
-          "buildTarget": "ngx-stately:build:development"
+          "buildTarget": "ngx-stately-test:build:development"
         }
       },
       "defaultConfiguration": "development"
@@ -63,7 +63,7 @@
     "extract-i18n": {
       "executor": "@angular/build:extract-i18n",
       "options": {
-        "buildTarget": "ngx-stately:build"
+        "buildTarget": "ngx-stately-test:build"
       }
     },
     "lint": {
@@ -73,17 +73,17 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{projectRoot}"],
       "options": {
-        "jestConfig": "apps/ngx-stately/jest.config.ts",
-        "tsConfig": "apps/ngx-stately/tsconfig.spec.json"
+        "jestConfig": "ngx-stately-test/jest.config.ts",
+        "tsConfig": "ngx-stately-test/tsconfig.spec.json"
       }
     },
     "serve-static": {
       "continuous": true,
       "executor": "@nx/web:file-server",
       "options": {
-        "buildTarget": "ngx-stately:build",
+        "buildTarget": "ngx-stately-test:build",
         "port": 4200,
-        "staticFilePath": "dist/apps/ngx-stately/browser",
+        "staticFilePath": "dist/ngx-stately-test/browser",
         "spa": true
       }
     }
