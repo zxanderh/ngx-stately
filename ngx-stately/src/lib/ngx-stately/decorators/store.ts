@@ -1,85 +1,100 @@
-import { signal, Injectable, TypeDecorator } from '@angular/core';
-import { debounceTime, distinctUntilChanged, Subscription } from 'rxjs';
 import 'reflect-metadata';
-import { toObservable } from '@angular/core/rxjs-interop';
-import { getPropertiesWithMetadata } from '../util/util';
-import { deserialize, serialize } from '../util/serialization';
+import { inject, Injector, runInInjectionContext } from '@angular/core';
+import { getPropertiesWithMetadata, STATELY_OPTIONS, StorageVarSignal } from '../util/util';
+import { storageVar } from '../signals/var';
+import { StatelyService } from '../service/stately.service';
+import { Constructor } from 'type-fest';
 
-type InjectableStore = Injectable & { storeParams?: boolean; debounceTime?: number };
-type UnboundInjectableStore = InjectableStore & { storage: Storage };
+export function Store(target: any) {
+  // we just need to do something here. Doesn't really matter what.
+  target[STATELY_OPTIONS] = true;
+}
 
-export function Store(options: UnboundInjectableStore): TypeDecorator {
-  const { storeParams, storage, providedIn, debounceTime: $debounceTime } = options;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (ctor: any) => {
-    // signals container
-    Object.defineProperty(ctor.prototype, 'signals', {
-      get() {
-        return (this._signals ||= {});
-      },
-    });
-    // default values container
-    Object.defineProperty(ctor.prototype, 'defaults', {
-      get() {
-        return (this._defaults ||= {});
-      },
-    });
-    // subscription sink for easy unsubscribe
-    Object.defineProperty(ctor.prototype, 'sub', {
-      get() {
-        return (this._sub ||= new Subscription());
-      },
-    });
+/**
+ * Decorator factory that turns a class into a storage-backed store by wiring signals for each
+ * constructor parameter and keeping them synced via the supplied storage implementation.
+ */
+export abstract class DecoratedStore {
+  abstract storage: Storage;
+  private __injector = inject(Injector);
+  private signals: Record<string, StorageVarSignal<any>> = {};
+  private _initialized: Record<string, boolean> = {};
 
-    if (storeParams) {
-      const props = getPropertiesWithMetadata(ctor);
+  constructor() {
+    const ctor = this.constructor as Constructor<DecoratedStore>;
+    const props = getPropertiesWithMetadata(ctor);
 
-      for (const [key, constr] of Object.entries(props)) {
-        Object.defineProperty(ctor.prototype, key, {
-          get() {
-            return this.signals[key]();
-          },
-          set(value) {
-            if (this.signals[key] == null) {
-              this.defaults[key] = value;
-              const stored = storage.getItem(key);
-              if (stored != null) {
-                value = deserialize(stored, constr, key);
-              }
-              this.signals[key] = signal(value);
-              this.sub.add(
-                toObservable(this.signals[key])
-                  .pipe(distinctUntilChanged(), debounceTime($debounceTime ?? 500))
-                  .subscribe((val) => {
-                    if (val !== value) {
-                      // if changed from default value
-                      storage.setItem(key, serialize(val));
-                    }
-                  })
-              );
+    for (const [key] of Object.entries(props)) {
+      Object.defineProperty(this, key, {
+        configurable: true,
+        get: () => {
+          // ToDo this can't ever happen because typescript always initializes these properties. Right?
+          // if (this.signals[key] == null) {
+          //   // Lazy initialization: create storage-backed signal on first access
+          //   // This happens when the property is read before being set
+          //   const defaultValue = this.defaults?.[key];
+          //   // Get injector (either from constructor or inject it now)
+          //   const injector = this.__injector || inject(Injector);
+          //   // Use runInInjectionContext to ensure storageVar can inject StatelyService
+          //   this.signals[key] = runInInjectionContext(injector, () => {
+          //     return storageVar({
+          //       key,
+          //       storage,
+          //       default: defaultValue,
+          //     });
+          //   });
+          //   // Register the signal to set up persistence effect
+          //   const service = injector.get(StatelyService);
+          //   service.register(this.signals[key]);
+          //   this._initialized[key] = true;
+          // }
+          return this.signals[key]();
+        },
+        set: (value) => {
+          const isFirstSet = this.signals[key] == null;
+
+          if (isFirstSet) {
+            // First set: create signal and check storage
+            const injector = this.__injector || inject(Injector);
+            this.signals[key] = runInInjectionContext(injector, () => {
+              return storageVar({
+                key,
+                storage: this.storage,
+                default: value,
+              });
+            });
+            const service = injector.get(StatelyService);
+            service.register(this.signals[key]);
+
+            // Check if storage had a value
+            const storedValue = this.storage.getItem(key);
+            const currentValue = this.signals[key]();
+
+            // ToDo this isn't possible, right?
+            // Only set the constructor value if storage was empty
+            // If storage had a value, storageVar already used it, so we keep it
+            if (storedValue == null && currentValue !== value) {
+              this.signals[key].set(value);
             }
+
+            this._initialized[key] = true;
+          } else {
+            // Subsequent sets: always update the value
             this.signals[key].set(value);
-            return value;
-          },
-        });
-      }
+          }
+          return value;
+        },
+      });
     }
-
-    return Injectable({ providedIn: providedIn || null })(ctor);
-  };
+  }
 }
 
-export function SessionStore(options: InjectableStore) {
-  return Store({
-    ...options,
-    storage: sessionStorage,
-  } as UnboundInjectableStore);
+
+export class SessionStore extends DecoratedStore {
+  storage = sessionStorage;
 }
-export function LocalStore(options: InjectableStore) {
-  const storage =
-    typeof localStorage === 'undefined' ? sessionStorage : localStorage;
-  return Store({
-    ...options,
-    storage,
-  } as UnboundInjectableStore);
+
+
+export class LocalStore extends DecoratedStore {
+  storage = localStorage;
 }

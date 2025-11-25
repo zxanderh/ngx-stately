@@ -21,7 +21,12 @@
             "input": "ngx-stately-test/public"
           }
         ],
-        "styles": ["ngx-stately-test/src/styles.scss"]
+        "styles": ["ngx-stately-test/src/styles.scss"],
+        "stylePreprocessorOptions": {
+          "sass": {
+            "silenceDeprecations": ["import", "global-builtin"]
+          }
+        }
       },
       "configurations": {
         "production": {

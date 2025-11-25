@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-inferrable-types */
-import { SessionStore } from 'ngx-stately';
+import { SessionStore, Store } from 'ngx-stately';
 
-@SessionStore({
-  providedIn: 'root',
-})
-export class SessionStoreService {
+@Store
+export class SessionStoreService extends SessionStore {
   constructor(
     public foo: string = 'bar',
-  ) {}
+    public token: string,
+  ) { super(); }
 }

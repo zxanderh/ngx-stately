@@ -12,10 +12,17 @@ export default {
       },
     ],
   },
-  transformIgnorePatterns: ['node_modules/(?!.*\\.mjs$)'],
+  transformIgnorePatterns: ['node_modules/(?!lodash-es/.*|.*\\.mjs$)'],
   snapshotSerializers: [
     'jest-preset-angular/build/serializers/no-ng-attributes',
     'jest-preset-angular/build/serializers/ng-snapshot',
     'jest-preset-angular/build/serializers/html-comment',
+  ],
+  moduleNameMapper: {
+    '^lodash-es$': '<rootDir>/testing/lodash-es',
+  },
+  coveragePathIgnorePatterns: [
+    'storage.polyfill.ts',
+    'jest.helper.ts',
   ],
 };

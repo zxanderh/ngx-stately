@@ -1,8 +1,10 @@
 import 'reflect-metadata';
+import '../../../../testing/jest.helper';
 
 import { TestBed } from '@angular/core/testing';
 
 import { LocalStore, SessionStore } from './store';
+import { provideStately } from '../service/stately.service';
 
 const instantiate = <T>(factory: () => T): T => {
   return TestBed.runInInjectionContext(factory);
@@ -33,12 +35,18 @@ const createStorageMock = (): Storage => {
   storeParams: true,
 })
 class Animal {
-  constructor(public breed: string = 'corgi', public dog: boolean = true) {}
+  constructor(
+    public breed: string = 'corgi',
+    public dog: boolean = true,
+    public description?: string | null,
+  ) {}
 }
 
 describe('SessionStore decorator', () => {
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [provideStately()],
+    });
     sessionStorage.clear();
     jest.useFakeTimers();
   });
@@ -59,14 +67,24 @@ describe('SessionStore decorator', () => {
     expect(animal.dog).toBe(false);
   });
 
-  it('persists signal updates after the debounce window', () => {
+  it('lazily initializes unset properties on first access', () => {
+    const animal = instantiate(() => new Animal(undefined, undefined, null));
+
+    expect(animal.description).toBeNull();
+  });
+
+  it('persists signal updates immediately', () => {
     const animal = instantiate(() => new Animal('poodle', false));
 
+    // First set creates the signal (skips persistence due to effect's firstCheck)
     animal.breed = 'shiba';
+    // Flush effects to initialize (sets firstCheck = false)
+    jest.runAllTimers();
+    // Second set triggers persistence
+    animal.breed = 'shiba-updated';
+    jest.runAllTimers();
 
-    jest.advanceTimersByTime(600);
-
-    expect(sessionStorage.getItem('breed')).toBe(JSON.stringify('shiba'));
+    expect(sessionStorage.getItem('breed')).toBe(JSON.stringify('shiba-updated'));
   });
 
   it('supports custom stores decorated inside tests', () => {
@@ -96,13 +114,84 @@ describe('SessionStore decorator', () => {
     expect(store.complex).toBeInstanceOf(MutableValue);
     expect(store.complex.value).toBe('from-storage');
   });
+
+  it('persists signal changes without debounce', () => {
+    @SessionStore({
+      providedIn: 'root',
+      storeParams: true,
+    })
+    class ImmediateStore {
+      constructor(public breed: string = 'corgi') {}
+    }
+
+    const store = instantiate(() => new ImmediateStore());
+    // First set creates signal (skips persistence)
+    store.breed = 'samoyed';
+    // Flush effects to initialize (sets firstCheck = false)
+    jest.runAllTimers();
+    // Second set triggers persistence immediately
+    store.breed = 'samoyed-updated';
+    jest.runAllTimers();
+
+    expect(sessionStorage.getItem('breed')).toBe(JSON.stringify('samoyed-updated'));
+  });
+
+  it('skips parameter wiring when storeParams is disabled', () => {
+    @SessionStore({
+      providedIn: 'root',
+      storeParams: false,
+    })
+    class PlainStore {
+      constructor(public breed: string = 'corgi') {}
+    }
+
+    const store = instantiate(() => new PlainStore());
+    store.breed = 'akita';
+
+    jest.runAllTimers();
+    expect(sessionStorage.getItem('breed')).toBeNull();
+  });
+
+  it('serializes complex objects by delegating to toJSON', () => {
+    class Serializable {
+      constructor(public value: string) {}
+
+      toJSON() {
+        return { value: this.value };
+      }
+    }
+
+    @SessionStore({
+      providedIn: 'root',
+      storeParams: true,
+    })
+    class JsonStore {
+      constructor(public complex: Serializable = new Serializable('alpha')) {}
+    }
+
+    const store = instantiate(() => new JsonStore());
+    // First set creates signal (skips persistence)
+    store.complex = new Serializable('beta');
+    // Flush effects to initialize (sets firstCheck = false)
+    jest.runAllTimers();
+    // Second set triggers persistence
+    store.complex = new Serializable('beta-updated');
+    jest.runAllTimers();
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    expect(JSON.parse(sessionStorage.getItem('complex')!)).toEqual({
+      value: 'beta-updated',
+    });
+  });
 });
 
 describe('LocalStore decorator', () => {
   let localStorageMock: Storage;
 
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      providers: [provideStately()],
+    });
     sessionStorage.clear();
     localStorageMock = createStorageMock();
     Object.defineProperty(globalThis, 'localStorage', {
@@ -151,11 +240,15 @@ describe('LocalStore decorator', () => {
 
     const animal = instantiate(() => new LocalAnimal());
 
+    // First set creates signal (skips persistence)
     animal.breed = 'akita';
+    // Flush effects to initialize (sets firstCheck = false)
+    jest.runAllTimers();
+    // Second set triggers persistence
+    animal.breed = 'akita-updated';
+    jest.runAllTimers();
 
-    jest.advanceTimersByTime(600);
-
-    expect(localStorage.getItem('breed')).toBe(JSON.stringify('akita'));
+    expect(localStorage.getItem('breed')).toBe(JSON.stringify('akita-updated'));
   });
 
   it('falls back to sessionStorage when localStorage is unavailable', () => {

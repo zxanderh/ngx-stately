@@ -11,7 +11,8 @@
     "isolatedModules": true,
     "emitDecoratorMetadata": true,
     "module": "preserve",
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "useDefineForClassFields": false
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,
