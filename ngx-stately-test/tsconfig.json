@@ -12,7 +12,8 @@
     "emitDecoratorMetadata": true,
     "module": "preserve",
     "esModuleInterop": true,
-    "useDefineForClassFields": false
+    "useDefineForClassFields": false,
+    "lib": ["dom", "es2022"]
   },
   "angularCompilerOptions": {
     "enableI18nLegacyMessageIdFormat": false,

@@ -1,3 +1,5 @@
 autoInstallPeers: true
 onlyBuiltDependencies:
+  - esbuild
+  - lmdb
   - nx

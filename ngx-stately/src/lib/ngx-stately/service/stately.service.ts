@@ -1,32 +1,20 @@
-import { effect, inject, Injectable, Injector, signal, CreateEffectOptions, assertInInjectionContext, InjectionToken, makeEnvironmentProviders, runInInjectionContext } from "@angular/core";
+import { effect, inject, Injectable, Injector, signal, CreateEffectOptions, assertInInjectionContext, makeEnvironmentProviders, runInInjectionContext } from "@angular/core";
 import { attachToSignal, isStorageVarSignal, StandaloneStorageVarOptions, STATELY_OPTIONS, StorageVarSignal } from "../util/util";
 import { deserialize, serialize } from "../util/serialization";
 import { Constructor } from "type-fest";
 
-// interface StorageRecord {
-//   [name: string]: Storage;
-// }
-
 type StorageRecord<T extends string = string> = Record<T, Storage>;
 
-export const STORAGE_RECORD = new InjectionToken<StorageRecord>('STORAGE_RECORD');
+// export const STORAGE_RECORD = new InjectionToken<StorageRecord>('STORAGE_RECORD');
 
 type GetSetter = (<T>(key: string, ctor?: Constructor<T>) => T) & { set<T>(key: string, value: T): void; };
 
-export type CustomStatelyService<T extends StorageRecord> = {
-  [k in keyof T]: GetSetter;
-} & StatelyService<T>;
-
-export function provideStately(storages?: StorageRecord, services?: any[]) {
-  if (storages == null) {
-    storages = { session: sessionStorage };
-    if (typeof localStorage !== 'undefined') {
-      storages['local'] = localStorage;
-    }
-  }
+export function provideStately(options?: { statelyService?: Constructor<StatelyService>; services?: any[] }) {
+  options ||= {};
+  options.statelyService ||= DefaultStatelyService;
   const srvcs: Parameters<typeof makeEnvironmentProviders>[0] = [];
-  if (services != null) {
-    for (const service of services) {
+  if (options.services != null) {
+    for (const service of options.services) {
       let instance;
       srvcs.push({
         provide: service,
@@ -36,45 +24,43 @@ export function provideStately(storages?: StorageRecord, services?: any[]) {
     }
   }
   return makeEnvironmentProviders([
-    { provide: STORAGE_RECORD, useValue: storages },
-    { provide: StatelyService, deps: [STORAGE_RECORD] },
+    { provide: StatelyService, useClass: options.statelyService },
     ...srvcs,
   ]);
 }
 
+export function statelyStorage(name: string, storage: Storage, statelyService?: StatelyService) {
+  const service = statelyService || inject(StatelyService);
+  return StatelyService.prototype.registerStorage.call(service, name, storage);
+}
+
 @Injectable()
-export class StatelyService<T extends StorageRecord = StorageRecord<'session'|'local'>> {
+export class StatelyService {
   private injector = inject(Injector);
-  private storages = inject(STORAGE_RECORD) as T;
-  private storageNames = new Map<Storage, keyof T>;
-  signals = {} as Record<keyof T, Record<string, StorageVarSignal<unknown>>>;
+  private storages = {} as StorageRecord;
+  private storageNames = new Map<Storage, string>();
+  signals = {} as Record<string, Record<string, StorageVarSignal<unknown>>>;
 
-  private get self() { return this as CustomStatelyService<T>; }
+  registerStorage(name: string, storage: Storage) {
+    this.signals[name] = {};
+    this.storages[name] = storage;
 
-  constructor() {
-    for (const name in this.storages) {
-      if (!Object.prototype.hasOwnProperty.call(this.storages, name)) continue;
+    // add storage to storage name lookup
+    this.storageNames.set(this.storages[name], name);
 
-      // create object to store signals for this storage type
-      this.signals[name] = {};
+    // set up getter setter
+    const getterSetter = function(this: StatelyService, key: string, ctor?: Constructor<unknown>) {
+      return this.getOrCreateSignal(name, key, { ctor })();
+    } as GetSetter;
+    getterSetter.set = (key: string, value: unknown) => {
+      this.getOrCreateSignal(name, key, { force: true }).set(value);
+    };
 
-      // add storage to storage name lookup
-      this.storageNames.set(this.storages[name], name);
-
-      // set up getter setter
-      // ToDo fix type
-      // @ts-expect-error todo
-      this.self[name] = function(this: StatelyService<T>, key: string, ctor?: Constructor<unknown>) {
-        return this.getOrCreateSignal(name, key, { ctor })();
-      } as GetSetter;
-      this.self[name].set = (key: string, value: unknown) => {
-        this.getOrCreateSignal(name, key, { force: true }).set(value);
-      };
-    }
+    return getterSetter;
   }
 
-  private getOrCreateSignal(storageName: keyof T, key: string, options: { default?: unknown; ctor?: Constructor<unknown>; force?: boolean }) {
-    if (this.self.signals[storageName][key] == null) {
+  private getOrCreateSignal(storageName: string, key: string, options: { default?: unknown; ctor?: Constructor<unknown>; force?: boolean }) {
+    if (this.signals[storageName][key] == null) {
       const storage = this.storages[storageName];
       const varOptions: StandaloneStorageVarOptions<unknown> = {
         default: options.default,
@@ -99,8 +85,6 @@ export class StatelyService<T extends StorageRecord = StorageRecord<'session'|'l
       // register with stately service
       this.register(varSignal, options.force);
       // store signal for future lookups
-      // ToDo fix type
-      // @ts-expect-error todo
       this.signals[storageName][key] = varSignal;
       return varSignal;
     }
@@ -135,4 +119,12 @@ export class StatelyService<T extends StorageRecord = StorageRecord<'session'|'l
       options.initialized = true;
     }
   };
+}
+
+@Injectable()
+export class DefaultStatelyService extends StatelyService {
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  session = statelyStorage('session', sessionStorage, this)!;
+  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+  local = statelyStorage('local', localStorage, this)!;
 }

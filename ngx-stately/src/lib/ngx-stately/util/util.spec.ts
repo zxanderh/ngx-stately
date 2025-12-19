@@ -7,27 +7,19 @@ import {
   isPrimitiveConstructor,
   isStorageVarSignal,
   mockStorage,
-  registerStorage,
   STATELY_OPTIONS,
-  storages,
 } from './util';
 import { storageVar } from '../signals/var';
 import { TestBed } from '@angular/core/testing';
+import { provideStately } from '../service/stately.service';
 
 describe('utility helpers', () => {
   let injector: Injector;
-  afterEach(() => {
-    Object.keys(storages).forEach((key) => delete storages[key]);
-  });
   beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideStately()],
+    });
     injector = TestBed.inject(Injector);
-  });
-
-  it('registers storages under friendly identifiers', () => {
-    const storage = mockStorage('registered-storage', false);
-    registerStorage('custom', storage);
-
-    expect(storages['custom']).toBe(storage);
   });
 
   it('detects storage-backed signals', () => {

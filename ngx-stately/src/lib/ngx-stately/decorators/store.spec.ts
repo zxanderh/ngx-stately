@@ -3,8 +3,9 @@ import '../../../../testing/jest.helper';
 
 import { TestBed } from '@angular/core/testing';
 
-import { LocalStore, SessionStore } from './store';
+import { LocalStore, SessionStore, Store } from './store';
 import { provideStately } from '../service/stately.service';
+import { inject } from '@angular/core';
 
 const instantiate = <T>(factory: () => T): T => {
   return TestBed.runInInjectionContext(factory);
@@ -30,17 +31,38 @@ const createStorageMock = (): Storage => {
   } as Storage;
 };
 
-@SessionStore({
-  providedIn: 'root',
-  storeParams: true,
-})
-class Animal {
+@Store
+class Animal extends SessionStore {
   constructor(
     public breed: string = 'corgi',
     public dog: boolean = true,
     public description?: string | null,
-  ) {}
+  ) { super(); }
 }
+
+describe('Decorated stores', () => {
+  let animal: Animal;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideStately({ services: [ Animal ] })],
+    });
+    animal = TestBed.runInInjectionContext(() => inject(Animal));
+    sessionStorage.clear();
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it('uses injected class', () => {
+    expect(animal.breed).toBe('corgi');
+    expect(animal.dog).toBe(true);
+  });
+});
 
 describe('SessionStore decorator', () => {
   beforeEach(() => {
@@ -58,12 +80,12 @@ describe('SessionStore decorator', () => {
   });
 
   it('prefers persisted session values over constructor defaults', () => {
-    sessionStorage.setItem('breed', JSON.stringify('husky'));
+    sessionStorage.setItem('breed', JSON.stringify('maine coon'));
     sessionStorage.setItem('dog', JSON.stringify(false));
 
     const animal = instantiate(() => new Animal());
 
-    expect(animal.breed).toBe('husky');
+    expect(animal.breed).toBe('maine coon');
     expect(animal.dog).toBe(false);
   });
 
@@ -96,12 +118,9 @@ describe('SessionStore decorator', () => {
       }
     }
 
-    @SessionStore({
-      providedIn: 'root',
-      storeParams: true,
-    })
-    class CustomStore {
-      constructor(public complex: MutableValue = new MutableValue('default')) {}
+    @Store
+    class CustomStore extends SessionStore {
+      constructor(public complex: MutableValue = new MutableValue('default')) { super(); }
     }
 
     sessionStorage.setItem(
@@ -116,12 +135,9 @@ describe('SessionStore decorator', () => {
   });
 
   it('persists signal changes without debounce', () => {
-    @SessionStore({
-      providedIn: 'root',
-      storeParams: true,
-    })
-    class ImmediateStore {
-      constructor(public breed: string = 'corgi') {}
+    @Store
+    class ImmediateStore extends SessionStore {
+      constructor(public breed: string = 'corgi') { super(); }
     }
 
     const store = instantiate(() => new ImmediateStore());
@@ -137,12 +153,9 @@ describe('SessionStore decorator', () => {
   });
 
   it('skips parameter wiring when storeParams is disabled', () => {
-    @SessionStore({
-      providedIn: 'root',
-      storeParams: false,
-    })
-    class PlainStore {
-      constructor(public breed: string = 'corgi') {}
+    @Store
+    class PlainStore extends SessionStore {
+      constructor(public breed: string = 'corgi') { super(); }
     }
 
     const store = instantiate(() => new PlainStore());
@@ -161,12 +174,9 @@ describe('SessionStore decorator', () => {
       }
     }
 
-    @SessionStore({
-      providedIn: 'root',
-      storeParams: true,
-    })
-    class JsonStore {
-      constructor(public complex: Serializable = new Serializable('alpha')) {}
+    @Store
+    class JsonStore extends SessionStore {
+      constructor(public complex: Serializable = new Serializable('alpha')) { super(); }
     }
 
     const store = instantiate(() => new JsonStore());
@@ -214,12 +224,9 @@ describe('LocalStore decorator', () => {
     localStorage.setItem('breed', JSON.stringify('shepherd'));
     localStorage.setItem('dog', JSON.stringify(false));
 
-    @LocalStore({
-      providedIn: 'root',
-      storeParams: true,
-    })
-    class LocalAnimal {
-      constructor(public breed: string = 'corgi', public dog: boolean = true) {}
+    @Store
+    class LocalAnimal extends LocalStore {
+      constructor(public breed: string = 'corgi', public dog: boolean = true) { super(); }
     }
 
     const animal = instantiate(() => new LocalAnimal());
@@ -230,12 +237,9 @@ describe('LocalStore decorator', () => {
   });
 
   it('persists updates back into localStorage', () => {
-    @LocalStore({
-      providedIn: 'root',
-      storeParams: true,
-    })
-    class LocalAnimal {
-      constructor(public breed: string = 'poodle') {}
+    @Store
+    class LocalAnimal extends LocalStore {
+      constructor(public breed: string = 'poodle') { super(); }
     }
 
     const animal = instantiate(() => new LocalAnimal());
@@ -251,20 +255,14 @@ describe('LocalStore decorator', () => {
     expect(localStorage.getItem('breed')).toBe(JSON.stringify('akita-updated'));
   });
 
-  it('falls back to sessionStorage when localStorage is unavailable', () => {
+  it('throws when localStorage is unavailable', () => {
     delete (globalThis as { localStorage?: Storage }).localStorage;
-    sessionStorage.setItem('breed', JSON.stringify('retriever'));
 
-    @LocalStore({
-      providedIn: 'root',
-      storeParams: true,
-    })
-    class FallbackAnimal {
-      constructor(public breed: string = 'corgi') {}
+    @Store
+    class NonexistentAnimal extends LocalStore {
+      constructor(public species: string = 'narwhal') { super(); }
     }
 
-    const animal = instantiate(() => new FallbackAnimal());
-
-    expect(animal.breed).toBe('retriever');
+    expect(() => instantiate(() => new NonexistentAnimal())).toThrow(/Global "localStorage" is not available in this environment./);
   });
 });

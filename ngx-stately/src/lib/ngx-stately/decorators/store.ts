@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { inject, Injector, runInInjectionContext } from '@angular/core';
-import { getPropertiesWithMetadata, STATELY_OPTIONS, StorageVarSignal } from '../util/util';
+import { getGlobalOrThrow, getPropertiesWithMetadata, STATELY_OPTIONS, StorageVarSignal } from '../util/util';
 import { storageVar } from '../signals/var';
 import { StatelyService } from '../service/stately.service';
 import { Constructor } from 'type-fest';
@@ -70,7 +70,7 @@ export abstract class DecoratedStore {
             const storedValue = this.storage.getItem(key);
             const currentValue = this.signals[key]();
 
-            // ToDo this isn't possible, right?
+            // ToDo this is impossible, right?
             // Only set the constructor value if storage was empty
             // If storage had a value, storageVar already used it, so we keep it
             if (storedValue == null && currentValue !== value) {
@@ -91,10 +91,10 @@ export abstract class DecoratedStore {
 
 
 export class SessionStore extends DecoratedStore {
-  storage = sessionStorage;
+  storage = getGlobalOrThrow<Storage>('sessionStorage');
 }
 
 
 export class LocalStore extends DecoratedStore {
-  storage = localStorage;
+  storage = getGlobalOrThrow<Storage>('localStorage');
 }

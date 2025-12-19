@@ -2,9 +2,9 @@ import 'reflect-metadata';
 import '../../../../testing/storage.polyfill';
 
 import { TestBed } from '@angular/core/testing';
-import { signal } from '@angular/core';
+import { inject, signal } from '@angular/core';
 
-import { provideStately, StatelyService } from './stately.service';
+import { DefaultStatelyService, provideStately, StatelyService } from './stately.service';
 import {
   attachToSignal,
   isStorageVarSignal,
@@ -14,20 +14,20 @@ import {
   StorageVarSignal,
 } from '../util/util';
 
-const instantiate = <T>(factory: () => T): T => {
-  return TestBed.runInInjectionContext(factory);
-};
+class TestStatelyService extends DefaultStatelyService {}
 
 describe('StatelyService', () => {
-  let service: StatelyService;
+  let service: DefaultStatelyService;
 
   beforeEach(() => {
     TestBed.configureTestingModule({
-      providers: [provideStately()],
+      providers: [provideStately({
+        statelyService: TestStatelyService,
+      })],
     });
 
+    service = TestBed.runInInjectionContext(() => inject(StatelyService) as DefaultStatelyService);
     jest.useFakeTimers();
-    service = instantiate(() => new StatelyService());
   });
 
   afterEach(() => {
@@ -37,6 +37,10 @@ describe('StatelyService', () => {
   });
 
   describe('Service Initialization', () => {
+    it('should use custom stately service class', () => {
+      expect(service).toBeInstanceOf(TestStatelyService);
+    });
+
     it('initializes session and local getter/setter functions', () => {
       expect(typeof service.session).toBe('function');
       expect(typeof service.local).toBe('function');

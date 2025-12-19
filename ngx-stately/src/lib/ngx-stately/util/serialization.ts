@@ -29,7 +29,7 @@ export function deserialize<T>(value: unknown, constr: { new (): T } | null, key
 }
 
 // ToDo: improve serialization
-/** Serialises a value, delegating to `toJSON` implementations when available. */
+/** Serializes a value, delegating to `toJSON` implementations when available. */
 export function serialize<T>(value: T) {
   let val: unknown = value;
   if (

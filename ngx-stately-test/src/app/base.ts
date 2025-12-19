@@ -3,11 +3,11 @@ import { FormsModule } from '@angular/forms';
 import { LocalStoreService } from '../services/localStore';
 import { SessionStoreService } from '../services/sessionStore';
 import { localVar } from 'ngx-stately';
-import { CommonModule } from '@angular/common';
+
 
 @Component({
   selector: 'app-base',
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   template: `
   <div class="d-block" style="width: 25rem;">
     <div class="m-3">

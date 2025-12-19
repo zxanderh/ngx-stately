@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { inject } from '@angular/core';
 
 import { storageVar, generateStorageVarCreator, sessionVar, localVar } from './var';
-import { StatelyService, provideStately } from '../service/stately.service';
+import { DefaultStatelyService, StatelyService, provideStately } from '../service/stately.service';
 import { DetailedError, mockStorage, StorageVarSignal } from '../util/util';
 
 const instantiate = <T>(factory: () => T): T => {
@@ -50,7 +50,7 @@ describe('storageVar', () => {
     let trackedSignal: StorageVarSignal<string | undefined>;
 
     const signal$ = instantiate(() => {
-      const service = inject(StatelyService);
+      const service = inject(StatelyService) as DefaultStatelyService;
       service.session.set('shared-key', 'existing');
 
       trackedSignal = service.signals['session']['shared-key'] as StorageVarSignal<string | undefined>;

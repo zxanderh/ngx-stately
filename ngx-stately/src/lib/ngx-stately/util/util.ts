@@ -4,14 +4,6 @@ import { Constructor } from 'type-fest';
 /** Internal symbol used to stash storage metadata on signals. */
 export const STATELY_OPTIONS = Symbol('STATELY_OPTIONS');
 
-/** Registry of named storage implementations that can be injected later. */
-export const storages: Record<string, Storage> = {};
-
-/** Registers a storage implementation by a friendly identifier for later lookup. */
-export function registerStorage(id: string, storage: Storage): void {
-  storages[id] = storage;
-}
-
 /** Injection token resolving to the storage backing the current stately context. */
 export const STORAGE = new InjectionToken<Storage>('STATELY_STORAGE');
 
@@ -94,7 +86,7 @@ function getConstructorParamNames(target: Constructor<unknown>): string[] {
     .map((arg) => arg.trim())
     .filter((arg) => arg.length > 0)
     // Strip default values: `foo = 1` -> `foo`
-    .map((arg) => arg.replace(/=.*/s, '').trim())
+    .map((arg) => arg.replace(/=[\s\S\r\n]*/, '').trim())
     // Only keep simple identifiers (no destructuring, rest, etc.)
     .filter((arg) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(arg));
 }
@@ -182,4 +174,12 @@ export class DetailedError extends Error {
       this['details'] = null;
     }
   }
+}
+
+export function getGlobalOrThrow<T = unknown>(key: string): T {
+  const value = (globalThis as any)[key];
+  if (value == null) {
+    throw new Error(`Global "${key}" is not available in this environment. Maybe you need a polyfill?`);
+  }
+  return value as T;
 }
