@@ -3,6 +3,7 @@ import 'reflect-metadata';
 import { Injector, runInInjectionContext, signal } from '@angular/core';
 
 import {
+  DetailedError,
   getPropertiesWithMetadata,
   isPrimitiveConstructor,
   isStorageVarSignal,
@@ -54,6 +55,34 @@ describe('utility helpers', () => {
     expect(metadata['dog']).toBe(Boolean);
   });
 
+  it('handles classes without constructors', () => {
+    class NoConstructor {}
+
+    const metadata = getPropertiesWithMetadata(NoConstructor);
+    expect(metadata).toEqual({});
+  });
+
+  it('handles empty constructor parameter lists', () => {
+    class EmptyConstructor {
+      constructor() {}
+    }
+
+    const metadata = getPropertiesWithMetadata(EmptyConstructor);
+    expect(metadata).toEqual({});
+  });
+
+  it('falls back to null when metadata is missing', () => {
+    class NoMetadata {
+      constructor(public name: string, public count: number) {}
+    }
+
+    const metadata = getPropertiesWithMetadata(NoMetadata);
+    expect(metadata).toEqual({
+      name: null,
+      count: null,
+    });
+  });
+
   it('detects primitive constructors', () => {
     expect(isPrimitiveConstructor(String)).toBe(true);
     expect(isPrimitiveConstructor(Number)).toBe(true);
@@ -61,6 +90,11 @@ describe('utility helpers', () => {
     expect(isPrimitiveConstructor(Symbol)).toBe(true);
     expect(isPrimitiveConstructor(class Custom {})).toBe(false);
     expect(isPrimitiveConstructor(null)).toBe(false);
+  });
+
+  it('sets DetailedError details to null when omitted', () => {
+    const error = new DetailedError('boom');
+    expect((error as { details?: unknown }).details).toBeNull();
   });
 
   it('creates isolated in-memory storage mocks', () => {

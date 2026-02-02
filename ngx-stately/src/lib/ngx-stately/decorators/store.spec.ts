@@ -4,7 +4,7 @@ import '../../../../testing/jest.helper';
 import { TestBed } from '@angular/core/testing';
 
 import { LocalStore, SessionStore, Store } from './store';
-import { provideStately } from '../service/stately.service';
+import { DefaultStatelyService, provideStately, StatelyService } from '../service/stately.service';
 import { inject } from '@angular/core';
 
 const instantiate = <T>(factory: () => T): T => {
@@ -93,6 +93,38 @@ describe('SessionStore decorator', () => {
     const animal = instantiate(() => new Animal(undefined, undefined, null));
 
     expect(animal.description).toBeNull();
+  });
+
+  it('falls back to inject(Injector) when the cached injector is unavailable', () => {
+    @Store
+    class FallbackStore extends SessionStore {
+      constructor(public breed: string = 'corgi') { super(); }
+    }
+
+    const store = instantiate(() => new FallbackStore());
+    (store as any).__injector = undefined;
+    (store as any).signals = {};
+    (store as any)._initialized = {};
+
+    TestBed.runInInjectionContext(() => {
+      store.breed = 'husky';
+    });
+
+    expect(store.breed).toBe('husky');
+  });
+
+  it('reconciles existing signals when storage is empty', () => {
+    @Store
+    class ExistingSignalStore extends SessionStore {
+      constructor(public breed: string = 'corgi') { super(); }
+    }
+
+    const service = TestBed.runInInjectionContext(() => inject(StatelyService) as DefaultStatelyService);
+    service.session.set('breed', 'existing');
+    expect(sessionStorage.getItem('breed')).toBeNull();
+
+    const store = instantiate(() => new ExistingSignalStore());
+    expect(store.breed).toBe('corgi');
   });
 
   it('persists signal updates immediately', () => {

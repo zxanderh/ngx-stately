@@ -70,10 +70,11 @@ export abstract class DecoratedStore {
             const storedValue = this.storage.getItem(key);
             const currentValue = this.signals[key]();
 
-            // ToDo this is impossible, right?
             // Only set the constructor value if storage was empty
             // If storage had a value, storageVar already used it, so we keep it
+            // Should be impossible with current implementation, but keeping it jic
             if (storedValue == null && currentValue !== value) {
+              /* istanbul ignore next */
               this.signals[key].set(value);
             }
 

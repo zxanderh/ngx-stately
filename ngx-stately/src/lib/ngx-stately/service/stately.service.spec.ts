@@ -4,7 +4,7 @@ import '../../../../testing/storage.polyfill';
 import { TestBed } from '@angular/core/testing';
 import { inject, signal } from '@angular/core';
 
-import { DefaultStatelyService, provideStately, StatelyService } from './stately.service';
+import { DefaultStatelyService, provideStately, statelyStorage, StatelyService } from './stately.service';
 import {
   attachToSignal,
   isStorageVarSignal,
@@ -57,6 +57,19 @@ describe('StatelyService', () => {
     it('correctly maps Storage instances to names', () => {
       expect(service.getStorageName(sessionStorage)).toBe('session');
       expect(service.getStorageName(localStorage)).toBe('local');
+    });
+  });
+
+  describe('statelyStorage helper', () => {
+    it('resolves StatelyService from the injection context when omitted', () => {
+      const customStorage = mockStorage('custom-storage', false);
+
+      const getterSetter = TestBed.runInInjectionContext(() =>
+        statelyStorage('custom', customStorage),
+      );
+
+      expect(service.getStorageName(customStorage)).toBe('custom');
+      expect(getterSetter.call(service, 'missing')).toBeUndefined();
     });
   });
 
@@ -547,4 +560,3 @@ describe('StatelyService', () => {
     });
   });
 });
-

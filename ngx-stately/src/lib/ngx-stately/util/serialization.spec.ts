@@ -44,6 +44,19 @@ describe('serialization helpers', () => {
     expect(plain.value).toBe('proto');
   });
 
+  it('skips prototype reassignment when already aligned', () => {
+    class Aligned {
+      value?: string;
+    }
+
+    const value = { value: 'ready' };
+    Object.setPrototypeOf(value, Aligned);
+
+    const result = deserialize<Aligned>(value, Aligned, 'aligned');
+    expect(Object.getPrototypeOf(result)).toBe(Aligned);
+    expect(result.value).toBe('ready');
+  });
+
   it('logs parse errors but still returns the original value', () => {
     const errorSpy = jest
       .spyOn(console, 'error')
