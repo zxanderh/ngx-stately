@@ -1,5 +1,5 @@
 import nx from '@nx/eslint-plugin';
-import baseConfig from '../eslint.config.mjs';
+import baseConfig, { overrides } from '../eslint.config.mjs';
 
 export default [
   ...baseConfig,
@@ -26,7 +26,7 @@ export default [
         'error',
         {
           type: 'attribute',
-          prefix: 'lib',
+          prefix: 'stately',
           style: 'camelCase',
         },
       ],
@@ -34,19 +34,10 @@ export default [
         'error',
         {
           type: 'element',
-          prefix: 'lib',
+          prefix: 'stately',
           style: 'kebab-case',
         },
       ],
-      '@typescript-eslint/no-inferrable-types': 'off',
-      '@typescript-eslint/no-explicit-any': 'off',
-			'@typescript-eslint/no-unused-expressions': ['error', {
-				allowTernary: true,
-			}],
-			'@typescript-eslint/no-unused-vars': ['error', {
-				varsIgnorePattern: '^_.*?',
-				argsIgnorePattern: '^_.*?',
-			}],
     },
   },
   {
@@ -54,4 +45,5 @@ export default [
     // Override or add rules here
     rules: {},
   },
+  ...overrides,
 ];

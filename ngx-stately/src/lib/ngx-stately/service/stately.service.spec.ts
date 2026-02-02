@@ -129,7 +129,7 @@ describe('StatelyService', () => {
 
       sessionStorage.setItem(
         'custom-key',
-        JSON.stringify({ value: 'from-storage' })
+        JSON.stringify({ value: 'from-storage' }),
       );
       const value = service.session('custom-key', CustomClass);
       // The constructor parameter is passed but deserialize receives the parsed JSON object
@@ -168,7 +168,7 @@ describe('StatelyService', () => {
       service.session.set('persist-key', 'persisted-value-2');
       TestBed.tick();
       expect(sessionStorage.getItem('persist-key')).toBe(
-        JSON.stringify('persisted-value-2')
+        JSON.stringify('persisted-value-2'),
       );
     });
 
@@ -180,7 +180,7 @@ describe('StatelyService', () => {
       service.session.set('rapid-key', 'value3');
       TestBed.tick();
       expect(sessionStorage.getItem('rapid-key')).toBe(
-        JSON.stringify('value3')
+        JSON.stringify('value3'),
       );
     });
 
@@ -191,7 +191,7 @@ describe('StatelyService', () => {
       service.local.set('local-set-key', 'local-set-value-2');
       TestBed.tick();
       expect(localStorage.getItem('local-set-key')).toBe(
-        JSON.stringify('local-set-value-2')
+        JSON.stringify('local-set-value-2'),
       );
     });
   });
@@ -247,7 +247,7 @@ describe('StatelyService', () => {
       jest.runAllTimers();
 
       expect(sessionStorage.getItem('subsequent')).toBe(
-        JSON.stringify('changed')
+        JSON.stringify('changed'),
       );
     });
 
@@ -270,7 +270,7 @@ describe('StatelyService', () => {
       jest.runAllTimers();
 
       expect(sessionStorage.getItem('injector-test')).toBe(
-        JSON.stringify('updated')
+        JSON.stringify('updated'),
       );
     });
 
@@ -313,7 +313,7 @@ describe('StatelyService', () => {
       TestBed.tick();
 
       expect(sessionStorage.getItem('session-key')).toBe(
-        JSON.stringify('session-value-2')
+        JSON.stringify('session-value-2'),
       );
       expect(localStorage.getItem('session-key')).toBeNull();
     });
@@ -326,7 +326,7 @@ describe('StatelyService', () => {
       TestBed.tick();
 
       expect(localStorage.getItem('local-key')).toBe(
-        JSON.stringify('local-value-2')
+        JSON.stringify('local-value-2'),
       );
       expect(sessionStorage.getItem('local-key')).toBeNull();
     });
@@ -340,7 +340,7 @@ describe('StatelyService', () => {
       TestBed.tick();
 
       expect(sessionStorage.getItem('serialize-key')).toBe(
-        JSON.stringify(obj)
+        JSON.stringify(obj),
       );
     });
 
@@ -377,11 +377,11 @@ describe('StatelyService', () => {
   });
 
   describe('getStorageName() Method', () => {
-    it("returns 'session' for sessionStorage instance", () => {
+    it('returns \'session\' for sessionStorage instance', () => {
       expect(service.getStorageName(sessionStorage)).toBe('session');
     });
 
-    it("returns 'local' for localStorage instance", () => {
+    it('returns \'local\' for localStorage instance', () => {
       expect(service.getStorageName(localStorage)).toBe('local');
     });
 
@@ -429,7 +429,7 @@ describe('StatelyService', () => {
       service.session.set('', 'empty-key-value-2');
       TestBed.tick();
       expect(sessionStorage.getItem('')).toBe(
-        JSON.stringify('empty-key-value-2')
+        JSON.stringify('empty-key-value-2'),
       );
       expect(service.session('')).toBe('empty-key-value-2');
     });
@@ -442,7 +442,7 @@ describe('StatelyService', () => {
       service.session.set(specialKey, 'special-value-2');
       TestBed.tick();
       expect(sessionStorage.getItem(specialKey)).toBe(
-        JSON.stringify('special-value-2')
+        JSON.stringify('special-value-2'),
       );
     });
 
@@ -454,7 +454,7 @@ describe('StatelyService', () => {
       service.session.set('large-key', largeValue);
       TestBed.tick();
       expect(sessionStorage.getItem('large-key')).toBe(
-        JSON.stringify(largeValue)
+        JSON.stringify(largeValue),
       );
     });
 
@@ -496,7 +496,7 @@ describe('StatelyService', () => {
     it('correctly uses deserialize() for reading from storage', () => {
       const deserializeSpy = jest.spyOn(
         require('../util/serialization'),
-        'deserialize'
+        'deserialize',
       );
       sessionStorage.setItem('deserialize-key', JSON.stringify('test'));
       service.session('deserialize-key');
@@ -507,7 +507,7 @@ describe('StatelyService', () => {
     it('correctly uses serialize() for writing to storage', () => {
       const serializeSpy = jest.spyOn(
         require('../util/serialization'),
-        'serialize'
+        'serialize',
       );
       // First set creates signal (skips persistence)
       service.session.set('serialize-key', 'test-value');
@@ -521,7 +521,7 @@ describe('StatelyService', () => {
     it('correctly uses attachToSignal() to create storage-backed signals', () => {
       const attachSpy = jest.spyOn(
         require('../util/util'),
-        'attachToSignal'
+        'attachToSignal',
       );
       service.session('attach-key');
       expect(attachSpy).toHaveBeenCalled();
@@ -531,7 +531,7 @@ describe('StatelyService', () => {
     it('correctly uses isStorageVarSignal() for validation', () => {
       const isStorageVarSignalSpy = jest.spyOn(
         require('../util/util'),
-        'isStorageVarSignal'
+        'isStorageVarSignal',
       );
       const options: StandaloneStorageVarOptions<string> = {
         key: 'validate-key',

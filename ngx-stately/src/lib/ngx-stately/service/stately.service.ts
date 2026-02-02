@@ -1,7 +1,7 @@
-import { effect, inject, Injectable, Injector, signal, CreateEffectOptions, assertInInjectionContext, makeEnvironmentProviders, runInInjectionContext } from "@angular/core";
-import { attachToSignal, isStorageVarSignal, StandaloneStorageVarOptions, STATELY_OPTIONS, StorageVarSignal } from "../util/util";
-import { deserialize, serialize } from "../util/serialization";
-import { Constructor } from "type-fest";
+import { effect, inject, Injectable, Injector, signal, CreateEffectOptions, assertInInjectionContext, makeEnvironmentProviders, runInInjectionContext } from '@angular/core';
+import { attachToSignal, isStorageVarSignal, StandaloneStorageVarOptions, STATELY_OPTIONS, StorageVarSignal } from '../util/util';
+import { deserialize, serialize } from '../util/serialization';
+import { Constructor } from 'type-fest';
 
 type StorageRecord<T extends string = string> = Record<T, Storage>;
 

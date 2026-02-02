@@ -125,7 +125,7 @@ describe('SessionStore decorator', () => {
 
     sessionStorage.setItem(
       'complex',
-      JSON.stringify({ value: 'from-storage' })
+      JSON.stringify({ value: 'from-storage' }),
     );
 
     const store = instantiate(() => new CustomStore());
@@ -188,7 +188,6 @@ describe('SessionStore decorator', () => {
     store.complex = new Serializable('beta-updated');
     jest.runAllTimers();
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     expect(JSON.parse(sessionStorage.getItem('complex')!)).toEqual({
       value: 'beta-updated',
     });

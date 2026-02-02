@@ -24,7 +24,7 @@ import { localVar } from 'ngx-stately';
     </div>
   </div>
   `,
-  styles: ``,
+  styles: '',
 })
 export class Base {
   localStore = inject(LocalStoreService);

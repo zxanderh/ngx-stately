@@ -92,7 +92,7 @@ function getConstructorParamNames(target: Constructor<unknown>): string[] {
 }
 
 export function getPropertiesWithMetadata(
-  target: Constructor<unknown>
+  target: Constructor<unknown>,
 ): Record<string, Constructor<unknown> | null> {
   const types: Constructor<unknown>[] =
     Reflect.getMetadata('design:paramtypes', target) || [];
@@ -109,7 +109,7 @@ export function getPropertiesWithMetadata(
 
 /** Narrows down a value to the primitive constructor set (String/Number/etc). */
 export function isPrimitiveConstructor(
-  value: unknown
+  value: unknown,
 ): value is
   | StringConstructor
   | NumberConstructor
