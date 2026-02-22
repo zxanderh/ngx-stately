@@ -6,7 +6,7 @@ import { inject } from '@angular/core';
 
 import { storageVar, generateStorageVarCreator, sessionVar, localVar } from './var';
 import { DefaultStatelyService, StatelyService, provideStately } from '../service/stately.service';
-import { DetailedError, mockStorage, StorageVarSignal } from '../util/util';
+import { DetailedError, lazyRef, mockStorage, StorageVarSignal } from '../util/util';
 
 const instantiate = <T>(factory: () => T): T => {
   return TestBed.runInInjectionContext(factory);
@@ -44,6 +44,27 @@ describe('storageVar', () => {
     );
 
     expect(signal$()).toBe('fallback');
+  });
+
+  it('coerces primitives using constructor, if needed', () => {
+    const spy = jest.spyOn(Number.prototype, 'constructor' as any);
+    try {
+      // simulate numeric value mistakenly stored as string
+      sessionStorage.setItem('qty', JSON.stringify('9'));
+
+      const signal$ = instantiate(() =>
+        storageVar<number>({
+          key: 'qty',
+          storage: sessionStorage,
+          default: 0,
+        }),
+      );
+
+      expect(signal$()).toBe(9);
+      expect(spy).toHaveBeenCalledWith('9');
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('reuses existing signals tracked by StatelyService', () => {
@@ -99,6 +120,23 @@ describe('generateStorageVarCreator', () => {
     );
 
     expect(signal$()).toBe('from-default');
+  });
+
+  it('resolves lazyRef storage when creating a signal', () => {
+    sessionStorage.setItem('lazy-key', JSON.stringify('lazy-value'));
+    const lazyStorage = lazyRef(() => sessionStorage);
+    jest.spyOn(lazyStorage, 'value');
+
+    const createLocalVar = generateStorageVarCreator(lazyStorage);
+
+    const signal$ = instantiate(() =>
+      createLocalVar<string>({
+        key: 'lazy-key',
+      }),
+    );
+
+    expect(lazyStorage.value).toHaveBeenCalledTimes(1);
+    expect(signal$()).toBe('lazy-value');
   });
 });
 

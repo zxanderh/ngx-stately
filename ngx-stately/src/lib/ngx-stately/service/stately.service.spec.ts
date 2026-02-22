@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import '../../../../testing/storage.polyfill';
 
 import { TestBed } from '@angular/core/testing';
-import { inject, signal } from '@angular/core';
+import { inject, Injectable, signal } from '@angular/core';
 
 import { DefaultStatelyService, provideStately, statelyStorage, StatelyService } from './stately.service';
 import {
@@ -14,6 +14,7 @@ import {
   StorageVarSignal,
 } from '../util/util';
 
+@Injectable()
 class TestStatelyService extends DefaultStatelyService {}
 
 describe('StatelyService', () => {

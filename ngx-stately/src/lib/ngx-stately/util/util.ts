@@ -1,5 +1,4 @@
 import { CreateSignalOptions, InjectionToken, isSignal, signal, WritableSignal } from '@angular/core';
-import { Constructor } from 'type-fest';
 
 /** Internal symbol used to stash storage metadata on signals. */
 export const STATELY_OPTIONS = Symbol('STATELY_OPTIONS');
@@ -47,66 +46,6 @@ let SIGNAL: symbol;
 /** Exposes Angular's internal signal symbol so helpers can poke metadata when necessary. */
 export { SIGNAL };
 
-/** Uses TypeScript's emitted metadata to map constructor params back to their types. */
-// export function getPropertiesWithMetadata(
-//   target: Constructor<unknown>
-// ): Record<string, Constructor<unknown>> {
-//   const types = Reflect.getMetadata('design:paramtypes', target);
-//   return Object.getOwnPropertyNames(new target())
-//     .filter((key) => key !== 'constructor')
-//     .reduce((acc, key, i) => {
-//       acc[key] = types[i] || null;
-//       return acc;
-//     }, {} as Record<string, Constructor<unknown>>);
-// }
-
-function getConstructorParamNames(target: Constructor<unknown>): string[] {
-  // Works for both `class Foo { constructor(...) {} }` and `function Foo(...) {}`.
-  const src = target.toString();
-
-  // Try to match `constructor(...)` in class syntax
-  let match = src.match(/constructor\s*\(([^)]*)\)/);
-
-  // Fallback: match function-style constructor: `function Foo(...)`
-  if (!match) {
-    match = src.match(/^[^(]*\(([^)]*)\)/);
-  }
-
-  if (!match) {
-    return [];
-  }
-
-  const argsSrc = match[1].trim();
-  if (!argsSrc) {
-    return [];
-  }
-
-  return argsSrc
-    .split(',')
-    .map((arg) => arg.trim())
-    .filter((arg) => arg.length > 0)
-    // Strip default values: `foo = 1` -> `foo`
-    .map((arg) => arg.replace(/=[\s\S\r\n]*/, '').trim())
-    // Only keep simple identifiers (no destructuring, rest, etc.)
-    .filter((arg) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(arg));
-}
-
-export function getPropertiesWithMetadata(
-  target: Constructor<unknown>,
-): Record<string, Constructor<unknown> | null> {
-  const types: Constructor<unknown>[] =
-    Reflect.getMetadata('design:paramtypes', target) || [];
-
-  const paramNames = getConstructorParamNames(target);
-
-  const result: Record<string, Constructor<unknown> | null> = {};
-  paramNames.forEach((name, i) => {
-    result[name] = types[i] ?? null;
-  });
-
-  return result;
-}
-
 /** Narrows down a value to the primitive constructor set (String/Number/etc). */
 export function isPrimitiveConstructor(
   value: unknown,
@@ -117,10 +56,10 @@ export function isPrimitiveConstructor(
   | SymbolConstructor {
   if (value == null) return false;
   return (
-    value === String ||
-    value === Number ||
-    value === Boolean ||
-    value === Symbol
+    value === ('').constructor ||
+    value === (0).constructor ||
+    value === (false).constructor ||
+    value === STATELY_OPTIONS.constructor
   );
 }
 
@@ -159,6 +98,7 @@ export function mockStorage(name: string, globalize = true) {
   return out;
 }
 
+/** An error with additional details attached. */
 export class DetailedError extends Error {
   [key: PropertyKey]: unknown;
 
@@ -171,15 +111,53 @@ export class DetailedError extends Error {
         this[key] = details[key];
       }
     } else {
+      /* istanbul ignore next */
       this['details'] = null;
     }
   }
 }
 
+/**
+ * Retrieves the global value if present. Otherwise, throws a descriptive error.
+ *
+ * @param key The key to retrieve from the global object.
+ * @returns The value from the global object, if present.
+ */
 export function getGlobalOrThrow<T = unknown>(key: string): T {
   const value = (globalThis as any)[key];
   if (value == null) {
     throw new Error(`Global "${key}" is not available in this environment. Maybe you need a polyfill?`);
   }
   return value as T;
+}
+
+/** Unique symbol identifying LazyRef */
+const LAZY_REF = Symbol('LAZY_REF');
+
+/** A wrapper object containing a lazy evaluation function. */
+export interface LazyRef<T> {
+  [LAZY_REF]: true;
+  value: () => T;
+}
+
+/** Type guard for LazyRef. */
+export function isLazyRef(value: unknown): value is LazyRef<any> {
+  return (value as LazyRef<any>)?.[LAZY_REF] === true;
+}
+
+/**
+ * A function wrapper that allows a value to be lazily evaluated. Functionally based
+ * on Angular's forwardRef, though it serves a different purpose. This is primarily used
+ * with generateStorageVarCreator to bind to sessionStorage and localStorage even in
+ * environments that don't have them, avoiding throwing an error until localVar/sessionVar
+ * are actually called.
+ *
+ * @param fn function that returns the target value
+ * @returns the LazyRef instance
+ */
+export function lazyRef<T>(fn: () => T) {
+  return {
+    [LAZY_REF]: true,
+    value: fn,
+  } as LazyRef<T>;
 }
