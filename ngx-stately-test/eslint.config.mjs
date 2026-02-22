@@ -24,7 +24,6 @@ export default [
           style: 'kebab-case',
         },
       ],
-      '@typescript-eslint/no-inferrable-types': false,
     },
   },
   {

@@ -2,11 +2,9 @@
   "name": "ngx-stately",
   "version": "0.0.1",
   "peerDependencies": {
-    "@angular/core": "^20.3.0",
+    "@angular/core": "^21.0.5",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "~7.8.0",
-    "type-fest": "^5.2.0",
-    "lodash-es": "^4.17.21"
+    "type-fest": "^5.2.0"
   },
   "sideEffects": false
 }

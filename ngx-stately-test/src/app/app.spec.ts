@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { App } from './app';
-import { NxWelcome } from './nx-welcome';
+import { appConfig } from './app.config';
 
 describe('App', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [App, NxWelcome],
+      imports: [App],
+      ...appConfig,
     }).compileComponents();
   });
 
@@ -13,8 +14,8 @@ describe('App', () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain(
-      'Welcome ngx-stately',
-    );
+    for (const id of ['color', 'token', 'bool']) {
+      expect(compiled.querySelector(`input#${id}`)).toBeTruthy();
+    }
   });
 });
