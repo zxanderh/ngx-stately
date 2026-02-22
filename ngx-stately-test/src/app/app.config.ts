@@ -14,7 +14,8 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(appRoutes),
-    provideStately({ services: [SessionStoreService] }),
-    { provide: LocalStoreService, useClass: LocalStoreService },
+    provideStately(),
+    LocalStoreService,
+    SessionStoreService,
   ],
 };

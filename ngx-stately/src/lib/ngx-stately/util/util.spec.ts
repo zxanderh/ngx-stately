@@ -64,6 +64,7 @@ describe('utility helpers', () => {
 
   it('handles empty constructor parameter lists', () => {
     class EmptyConstructor {
+      // eslint-disable-next-line @typescript-eslint/no-empty-function
       constructor() {}
     }
 
