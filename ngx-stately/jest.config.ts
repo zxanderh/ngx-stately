@@ -1,3 +1,5 @@
+import type { JestConfigWithTsJest } from 'ts-jest';
+
 export default {
   displayName: 'ngx-stately',
   preset: '../jest.preset.js',
@@ -9,6 +11,9 @@ export default {
       {
         tsconfig: '<rootDir>/tsconfig.spec.json',
         stringifyContentPathRegex: '\\.(html|svg)$',
+        diagnostics: {
+          ignoreCodes: [151001],
+        },
       },
     ],
   },
@@ -25,4 +30,4 @@ export default {
     'storage.polyfill.ts',
     'jest.helper.ts',
   ],
-};
+} satisfies JestConfigWithTsJest;

@@ -109,4 +109,13 @@
     "*.wat": "$(capture).wasm",
     "*.xaml": "$(capture).xaml.cs"
   },
+  "terminal.integrated.env.linux": {
+    "NX_DEFAULT_PROJECT": "ngx-stately"
+  },
+  "terminal.integrated.env.osx": {
+    "NX_DEFAULT_PROJECT": "ngx-stately"
+  },
+  "terminal.integrated.env.windows": {
+    "NX_DEFAULT_PROJECT": "ngx-stately"
+  }
 }
