@@ -70,5 +70,5 @@
   "nx": {
     "includedScripts": []
   },
-  "packageManager": "pnpm@10.28.2+sha256.afa99b0b4b3d11c1dad2b472f9318ae2c78673829749ded527f89f09071479a7"
+  "packageManager": "pnpm@10.30.1+sha256.bc8bb877378eab6a8a83114eeb6a31ef88528db4ab5570299baba8fa54da2375"
 }
