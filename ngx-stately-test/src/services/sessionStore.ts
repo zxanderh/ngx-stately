@@ -1,10 +1,9 @@
  
-import { SessionStore, Store } from 'ngx-stately';
+import { Injectable } from '@angular/core';
+import { sessionVar } from 'ngx-stately';
 
-@Store
-export class SessionStoreService extends SessionStore {
-  constructor(
-    public foo: string = 'bar',
-    public token: string,
-  ) { super(); }
+@Injectable()
+export class SessionStoreService {
+  foo = sessionVar({ key: 'foo', default: 'bar' });
+  token = sessionVar({ key: 'token', default: '' });
 }

@@ -4,9 +4,11 @@ import { Injector, runInInjectionContext, signal } from '@angular/core';
 
 import {
   DetailedError,
-  getPropertiesWithMetadata,
+  getGlobalOrThrow,
+  isLazyRef,
   isPrimitiveConstructor,
   isStorageVarSignal,
+  lazyRef,
   mockStorage,
   STATELY_OPTIONS,
 } from './util';
@@ -34,53 +36,6 @@ describe('utility helpers', () => {
       expect(isStorageVarSignal(statelySignal)).toBe(true);
       expect(isStorageVarSignal(signal('plain'))).toBe(false);
       expect(statelySignal[STATELY_OPTIONS].key).toBe('tracked');
-    });
-  });
-
-  it('extracts constructor metadata emitted by TypeScript', () => {
-    function Noop(): ClassDecorator {
-      return () => undefined;
-    }
-
-    @Noop()
-    class Example {
-      constructor(
-        public breed: string = 'corgi',
-        public dog: boolean = true,
-      ) {}
-    }
-
-    const metadata = getPropertiesWithMetadata(Example);
-    expect(metadata['breed']).toBe(String);
-    expect(metadata['dog']).toBe(Boolean);
-  });
-
-  it('handles classes without constructors', () => {
-    class NoConstructor {}
-
-    const metadata = getPropertiesWithMetadata(NoConstructor);
-    expect(metadata).toEqual({});
-  });
-
-  it('handles empty constructor parameter lists', () => {
-    class EmptyConstructor {
-      // eslint-disable-next-line @typescript-eslint/no-empty-function
-      constructor() {}
-    }
-
-    const metadata = getPropertiesWithMetadata(EmptyConstructor);
-    expect(metadata).toEqual({});
-  });
-
-  it('falls back to null when metadata is missing', () => {
-    class NoMetadata {
-      constructor(public name: string, public count: number) {}
-    }
-
-    const metadata = getPropertiesWithMetadata(NoMetadata);
-    expect(metadata).toEqual({
-      name: null,
-      count: null,
     });
   });
 
@@ -116,5 +71,80 @@ describe('utility helpers', () => {
     expect((globalThis as Record<string, unknown>)['namedStorage']).toBe(
       storage,
     );
+  });
+
+  it('keeps storages isolated by instance', () => {
+    const a = mockStorage('storageA', false);
+    const b = mockStorage('storageB', false);
+
+    a.setItem('shared-key', 'a-value');
+    b.setItem('shared-key', 'b-value');
+
+    expect(a.getItem('shared-key')).toBe('a-value');
+    expect(b.getItem('shared-key')).toBe('b-value');
+  });
+
+  it('coerces non-string values to strings in setItem', () => {
+    const storage = mockStorage('coercionStorage', false);
+
+    storage.setItem('n', 42 as unknown as string);
+    storage.setItem('b', false as unknown as string);
+
+    expect(storage.getItem('n')).toBe('42');
+    expect(storage.getItem('b')).toBe('false');
+  });
+
+  it('does not expose the storage globally when globalize is false', () => {
+    const globalKey = 'nonGlobalStorage';
+    const globals = globalThis as Record<string, unknown>;
+    const existingValue = globals[globalKey];
+
+    const storage = mockStorage(globalKey, false);
+    expect(storage).toBeDefined();
+    expect(globals[globalKey]).toBe(existingValue);
+  });
+
+  it('defines a non-enumerable, non-configurable storage name property', () => {
+    const storage = mockStorage('describedStorage', false);
+    const descriptor = Object.getOwnPropertyDescriptor(storage, 'name');
+
+    expect((storage as Record<string, unknown>)['name']).toBe('describedStorage');
+    expect(descriptor?.enumerable).toBe(false);
+    expect(descriptor?.configurable).toBe(false);
+    expect(descriptor?.writable).toBe(false);
+  });
+
+  it('creates a lazy reference that defers factory execution', () => {
+    const factory = jest.fn().mockImplementation(() => sessionStorage);
+    const ref = lazyRef(factory);
+
+    expect(factory).not.toHaveBeenCalled();
+    expect(isLazyRef(ref)).toBe(true);
+    expect(ref.value()).toBe(sessionStorage);
+    expect(factory).toHaveBeenCalledTimes(1);
+  });
+
+  it('isLazyRef returns false for nullish values', () => {
+    expect(isLazyRef(null)).toBe(false);
+    expect(isLazyRef(undefined)).toBe(false);
+  });
+
+  it('isLazyRef returns false for lookalike objects without the lazy marker', () => {
+    expect(isLazyRef({ value: () => sessionStorage })).toBe(false);
+  });
+});
+
+describe('getGlobalOrThrow', () => {
+  let ogSnStorage: Storage;
+  beforeEach(() => {
+    ogSnStorage = globalThis.sessionStorage;
+    Object.defineProperty(window, 'sessionStorage', { value: null });
+  });
+  afterEach(() => {
+    Object.defineProperty(window, 'sessionStorage', { value: ogSnStorage });
+  });
+
+  it('getGlobalOrThrow: throws if not present', () => {
+    expect(() => getGlobalOrThrow('sessionStorage')).toThrow(/not available/);
   });
 });

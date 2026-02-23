@@ -1,5 +1,5 @@
 import { inject, signal } from '@angular/core';
-import { attachToSignal, DetailedError, StandaloneStorageVarOptions, StorageVarOptions, StorageVarSignal } from '../util/util';
+import { attachToSignal, DetailedError, getGlobalOrThrow, isLazyRef, lazyRef, LazyRef, StandaloneStorageVarOptions, StorageVarOptions, StorageVarSignal } from '../util/util';
 import { deserialize } from '../util/serialization';
 import { StatelyService } from '../service/stately.service';
 import { Constructor } from 'type-fest';
@@ -26,11 +26,14 @@ export function storageVar<T>(options: StandaloneStorageVarOptions<T | undefined
 }
 
 /** Factory builder that locks a storage implementation for future `storageVar` instances. */
-export function generateStorageVarCreator(storage: Storage) {
-  return <T>(options: StorageVarOptions<T | undefined>) => storageVar<T | undefined>({ storage, ...options });
+export function generateStorageVarCreator(storage: Storage | LazyRef<Storage>) {
+  return <T>(options: StorageVarOptions<T | undefined>) => storageVar<T | undefined>({
+    storage: isLazyRef(storage) ? storage.value() : storage,
+    ...options,
+  });
 }
 
 /** Convenience helper that persists signal state in `sessionStorage`. */
-export const sessionVar = generateStorageVarCreator(sessionStorage);
+export const sessionVar = generateStorageVarCreator(lazyRef(() => getGlobalOrThrow('sessionStorage')));
 /** Convenience helper that persists signal state in `localStorage`. */
-export const localVar = generateStorageVarCreator(localStorage);
+export const localVar = generateStorageVarCreator(lazyRef(() => getGlobalOrThrow('localStorage')));

@@ -1,4 +1,4 @@
-import { effect, inject, Injectable, Injector, signal, CreateEffectOptions, assertInInjectionContext, makeEnvironmentProviders, runInInjectionContext } from '@angular/core';
+import { effect, inject, Injectable, Injector, signal, CreateEffectOptions, assertInInjectionContext, makeEnvironmentProviders } from '@angular/core';
 import { attachToSignal, isStorageVarSignal, StandaloneStorageVarOptions, STATELY_OPTIONS, StorageVarSignal } from '../util/util';
 import { deserialize, serialize } from '../util/serialization';
 import { Constructor } from 'type-fest';
@@ -9,23 +9,11 @@ type StorageRecord<T extends string = string> = Record<T, Storage>;
 
 type GetSetter = (<T>(key: string, ctor?: Constructor<T>) => T) & { set<T>(key: string, value: T): void; };
 
-export function provideStately(options?: { statelyService?: Constructor<StatelyService>; services?: any[] }) {
+export function provideStately(options?: { statelyService?: Constructor<StatelyService> }) {
   options ||= {};
   options.statelyService ||= DefaultStatelyService;
-  const srvcs: Parameters<typeof makeEnvironmentProviders>[0] = [];
-  if (options.services != null) {
-    for (const service of options.services) {
-      let instance;
-      srvcs.push({
-        provide: service,
-        deps: [Injector, StatelyService],
-        useFactory: (injector: Injector, stately: StatelyService) => instance ||= runInInjectionContext(Injector.create({providers: [{provide: StatelyService, useValue: stately}], parent: injector}), () => Reflect.construct(service, [])),
-      });
-    }
-  }
   return makeEnvironmentProviders([
     { provide: StatelyService, useClass: options.statelyService },
-    ...srvcs,
   ]);
 }
 
