@@ -9,6 +9,7 @@ import {
   isPrimitiveConstructor,
   isStorageVarSignal,
   lazyRef,
+  MultiKeyMap,
   mockStorage,
   STATELY_OPTIONS,
 } from './util';
@@ -146,5 +147,82 @@ describe('getGlobalOrThrow', () => {
 
   it('getGlobalOrThrow: throws if not present', () => {
     expect(() => getGlobalOrThrow('sessionStorage')).toThrow(/not available/);
+  });
+});
+
+describe('MultiKeyMap', () => {
+  it('sets values, reads values, and tracks size without double-counting overwrites', () => {
+    const map = new MultiKeyMap<string, string, number>();
+
+    map.set('local', 'theme', 1);
+    map.set('local', 'theme', 2); // overwrite same entry
+    map.set('local', 'lang', 3);
+
+    expect(map.size).toBe(2);
+    expect(map.get('local', 'theme')).toBe(2);
+    expect(map.get('local', 'lang')).toBe(3);
+    expect(map.get('missing', 'entry')).toBeUndefined();
+    expect(map.has('local', 'theme')).toBe(true);
+    expect(map.has('missing', 'entry')).toBe(false);
+  });
+
+  it('deletes entries and prunes empty first-level keys', () => {
+    const map = new MultiKeyMap<string, string, string>();
+
+    map.set('session', 'token', 'abc');
+    map.set('session', 'user', 'zane');
+
+    expect(map.delete('session', 'token')).toBe(true);
+    expect(map.size).toBe(1);
+    expect(map.has('session', 'token')).toBe(false);
+    expect(map.has('session', 'user')).toBe(true);
+
+    expect(map.delete('session', 'user')).toBe(true); // removes now-empty inner map
+    expect(map.size).toBe(0);
+    expect(map.has('session', 'user')).toBe(false);
+    expect(map.get('session', 'user')).toBeUndefined();
+  });
+
+  it('returns false when deleting missing keys', () => {
+    const map = new MultiKeyMap<string, string, number>();
+    map.set('k1', 'k2', 1);
+
+    expect(map.delete('missing', 'k2')).toBe(false);
+    expect(map.delete('k1', 'missing')).toBe(false);
+    expect(map.size).toBe(1);
+  });
+
+  it('iterates entries, keys, and values across all buckets', () => {
+    const map = new MultiKeyMap<string, string, string>();
+    map.set('local', 'a', 'A');
+    map.set('local', 'b', 'B');
+    map.set('session', 'c', 'C');
+
+    expect([ ...map.entries() ]).toEqual([
+      ['local', 'a', 'A'],
+      ['local', 'b', 'B'],
+      ['session', 'c', 'C'],
+    ]);
+
+    expect([ ...map.keys() ]).toEqual([
+      ['local', 'a'],
+      ['local', 'b'],
+      ['session', 'c'],
+    ]);
+
+    expect([ ...map.values() ]).toEqual(['A', 'B', 'C']);
+  });
+
+  it('clears all data and resets size', () => {
+    const map = new MultiKeyMap<string, string, string>();
+    map.set('one', 'a', 'A');
+    map.set('two', 'b', 'B');
+
+    map.clear();
+
+    expect(map.size).toBe(0);
+    expect([ ...map.entries() ]).toEqual([]);
+    expect([ ...map.keys() ]).toEqual([]);
+    expect([ ...map.values() ]).toEqual([]);
   });
 });

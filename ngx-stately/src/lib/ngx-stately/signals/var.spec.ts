@@ -4,13 +4,11 @@ import '../../../../testing/storage.polyfill';
 import { TestBed } from '@angular/core/testing';
 import { inject } from '@angular/core';
 
-import { storageVar, generateStorageVarCreator, sessionVar, localVar } from './var';
-import { DefaultStatelyService, StatelyService, provideStately } from '../service/stately.service';
-import { DetailedError, lazyRef, mockStorage, StorageVarSignal } from '../util/util';
+import { generateStorageVarCreator, localVar, sessionVar, storageVar } from './var';
+import { provideStately, StatelyService } from '../service/stately.service';
+import { lazyRef, mockStorage } from '../util/util';
 
-const instantiate = <T>(factory: () => T): T => {
-  return TestBed.runInInjectionContext(factory);
-};
+const instantiate = <T>(factory: () => T): T => TestBed.runInInjectionContext(factory);
 
 describe('storageVar', () => {
   beforeEach(() => {
@@ -21,7 +19,28 @@ describe('storageVar', () => {
     localStorage.clear();
   });
 
-  it('bootstraps the signal from persisted storage values', () => {
+  it('delegates to StatelyService.createLinked()', () => {
+    const spy = jest.spyOn(StatelyService.prototype, 'createLinked');
+
+    instantiate(() =>
+      storageVar<string>({
+        key: 'delegated',
+        storage: sessionStorage,
+        default: 'value',
+      }),
+    );
+
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        key: 'delegated',
+        storage: sessionStorage,
+        default: 'value',
+      }),
+    );
+    spy.mockRestore();
+  });
+
+  it('bootstraps values from storage', () => {
     sessionStorage.setItem('breed', JSON.stringify('husky'));
 
     const signal$ = instantiate(() =>
@@ -46,57 +65,78 @@ describe('storageVar', () => {
     expect(signal$()).toBe('fallback');
   });
 
-  it('coerces primitives using constructor, if needed', () => {
-    const spy = jest.spyOn(Number.prototype, 'constructor' as any);
-    try {
-      // simulate numeric value mistakenly stored as string
-      sessionStorage.setItem('qty', JSON.stringify('9'));
+  it('infers ctor from default values during deserialization', () => {
+    // Simulate an older payload where a numeric value was stored as a JSON string.
+    sessionStorage.setItem('qty', JSON.stringify('9'));
 
-      const signal$ = instantiate(() =>
-        storageVar<number>({
-          key: 'qty',
-          storage: sessionStorage,
-          default: 0,
-        }),
-      );
+    const signal$ = instantiate(() =>
+      storageVar<number>({
+        key: 'qty',
+        storage: sessionStorage,
+        default: 0,
+      }),
+    );
 
-      expect(signal$()).toBe(9);
-      expect(spy).toHaveBeenCalledWith('9');
-    } finally {
-      spy.mockRestore();
-    }
+    expect(typeof signal$()).toBe('number');
+    expect(signal$()).toBe(9);
   });
 
-  it('reuses existing signals tracked by StatelyService', () => {
-    let trackedSignal: StorageVarSignal<string | undefined>;
+  it('respects custom equality comparators from signal options', () => {
+    const signal$ = instantiate(() =>
+      storageVar<{ id: number; label: string }>({
+        key: 'equal-key',
+        storage: sessionStorage,
+        default: { id: 1, label: 'initial' },
+        equal: (a, b) => a?.id === b?.id,
+      }),
+    );
 
-    const signal$ = instantiate(() => {
-      const service = inject(StatelyService) as DefaultStatelyService;
-      service.session.set('shared-key', 'existing');
+    signal$.set({ id: 1, label: 'updated-but-equal' });
+    TestBed.tick();
 
-      trackedSignal = service.signals['session']['shared-key'] as StorageVarSignal<string | undefined>;
+    expect(signal$()).toEqual({ id: 1, label: 'initial' });
+    expect(sessionStorage.getItem('equal-key')).toBeNull();
+  });
 
-      return storageVar<string>({
+  it('shares updates across linked signals for the same storage key', () => {
+    const [first, second, service] = instantiate(() => {
+      const one = storageVar<string>({
         key: 'shared-key',
         storage: sessionStorage,
       });
+      const two = storageVar<string>({
+        key: 'shared-key',
+        storage: sessionStorage,
+      });
+      return [one, two, inject(StatelyService)] as const;
     });
 
-    expect(signal$).toBe(trackedSignal!);
-    expect(signal$()).toBe('existing');
+    first.set('updated');
+    TestBed.tick();
+
+    expect(first).not.toBe(second);
+    expect(second()).toBe('updated');
+    expect(service.rootSignals.size).toBe(1);
   });
 
-  it('throws a DetailedError when storage is not registered with StatelyService', () => {
-    const customStorage = mockStorage('custom-storage');
+  it('supports any Storage implementation without registration', () => {
+    const customStorage = mockStorage('custom-storage', false);
 
-    expect(() =>
-      instantiate(() =>
-        storageVar({
-          key: 'unregistered',
-          storage: customStorage,
-        }),
-      ),
-    ).toThrow(DetailedError);
+    const signal$ = instantiate(() =>
+      storageVar<string>({
+        key: 'custom-key',
+        storage: customStorage,
+        default: 'initial',
+      }),
+    );
+
+    signal$.set('custom-updated');
+    TestBed.tick();
+
+    expect(signal$()).toBe('custom-updated');
+    expect(customStorage.getItem('custom-key')).toBe(
+      JSON.stringify('custom-updated'),
+    );
   });
 });
 
@@ -124,19 +164,21 @@ describe('generateStorageVarCreator', () => {
 
   it('resolves lazyRef storage when creating a signal', () => {
     sessionStorage.setItem('lazy-key', JSON.stringify('lazy-value'));
+
     const lazyStorage = lazyRef(() => sessionStorage);
-    jest.spyOn(lazyStorage, 'value');
+    const lazySpy = jest.spyOn(lazyStorage, 'value');
 
-    const createLocalVar = generateStorageVarCreator(lazyStorage);
-
+    const createSessionVar = generateStorageVarCreator(lazyStorage);
     const signal$ = instantiate(() =>
-      createLocalVar<string>({
+      createSessionVar<string>({
         key: 'lazy-key',
       }),
     );
 
-    expect(lazyStorage.value).toHaveBeenCalledTimes(1);
+    expect(lazySpy).toHaveBeenCalledTimes(1);
     expect(signal$()).toBe('lazy-value');
+
+    lazySpy.mockRestore();
   });
 });
 

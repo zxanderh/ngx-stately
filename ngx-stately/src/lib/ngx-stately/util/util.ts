@@ -1,10 +1,7 @@
-import { CreateSignalOptions, InjectionToken, isSignal, signal, WritableSignal } from '@angular/core';
+import { CreateSignalOptions, isSignal, signal, WritableSignal } from '@angular/core';
 
 /** Internal symbol used to stash storage metadata on signals. */
 export const STATELY_OPTIONS = Symbol('STATELY_OPTIONS');
-
-/** Injection token resolving to the storage backing the current stately context. */
-export const STORAGE = new InjectionToken<Storage>('STATELY_STORAGE');
 
 export interface StorageVarOptions<T> extends CreateSignalOptions<T> {
   default?: T;
@@ -17,10 +14,14 @@ export interface StandaloneStorageVarOptions<T> extends StorageVarOptions<T> {
   storage: Storage;
 }
 
+export type StorageVarRootValue<T> = { value: T; source: string };
+
 /** Writable signal augmented with storage metadata so stores can bootstrap it. */
 export type StorageVarSignal<T> = WritableSignal<T> & { [STATELY_OPTIONS]: StorageVarOptions<T> };
 
-/** Type guard that checks if a value is a storage-aware signal produced by this library. */
+export type StorageVarRootSignal<T> = WritableSignal<StorageVarRootValue<T>> & { [STATELY_OPTIONS]: StorageVarOptions<T> & { root: true } };
+
+/** Type guard that checks if a value is a storage-aware signal produced by ngx-stately. */
 export function isStorageVarSignal(val: unknown): val is StorageVarSignal<unknown> {
   if (isSignal(val) && STATELY_OPTIONS in val && val[STATELY_OPTIONS] != null) {
     return true;
@@ -64,7 +65,7 @@ export function isPrimitiveConstructor(
 }
 
 /** Builds an in-memory `Storage` mock and optionally exposes it on `globalThis`. */
-export function mockStorage(name: string, globalize = true) {
+export function mockStorage(name: string, globalize: boolean) {
   const out: Storage = (() => {
     let store: Record<string, string> = {};
 
@@ -161,3 +162,81 @@ export function lazyRef<T>(fn: () => T) {
     value: fn,
   } as LazyRef<T>;
 }
+
+export class MultiKeyMap<K1, K2, V> {
+  private root = new Map<K1, Map<K2, V>>();
+  private _size = 0;
+
+  set(k1: K1, k2: K2, value: V): this {
+    let inner = this.root.get(k1);
+
+    if (!inner) {
+      inner = new Map<K2, V>();
+      this.root.set(k1, inner);
+    }
+
+    if (!inner.has(k2)) {
+      this._size++;
+    }
+
+    inner.set(k2, value);
+    return this;
+  }
+
+  get(k1: K1, k2: K2): V | undefined {
+    return this.root.get(k1)?.get(k2);
+  }
+
+  has(k1: K1, k2: K2): boolean {
+    return this.root.get(k1)?.has(k2) ?? false;
+  }
+
+  delete(k1: K1, k2: K2): boolean {
+    const inner = this.root.get(k1);
+    if (!inner) return false;
+
+    const deleted = inner.delete(k2);
+
+    if (deleted) {
+      this._size--;
+
+      if (inner.size === 0) {
+        this.root.delete(k1);
+      }
+    }
+
+    return deleted;
+  }
+
+  clear(): void {
+    this.root.clear();
+    this._size = 0;
+  }
+
+  get size(): number {
+    return this._size;
+  }
+
+  *entries(): IterableIterator<readonly [K1, K2, V]> {
+    for (const [k1, inner] of this.root) {
+      for (const [k2, value] of inner) {
+        yield [k1, k2, value] as const;
+      }
+    }
+  }
+
+  *keys(): IterableIterator<readonly [K1, K2]> {
+    for (const [k1, inner] of this.root) {
+      for (const k2 of inner.keys()) {
+        yield [k1, k2] as const;
+      }
+    }
+  }
+
+  *values(): IterableIterator<V> {
+    for (const inner of this.root.values()) {
+      yield* inner.values();
+    }
+  }
+}
+

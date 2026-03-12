@@ -9,7 +9,7 @@ import { localVar } from 'ngx-stately';
   selector: 'app-base',
   imports: [FormsModule],
   template: `
-  <div class="d-block" style="width: 25rem;">
+  <div class="d-block card" style="width: 25rem;">
     <div class="m-3">
       <label for="color" class="form-label">Color</label>
       <input type="color" name="color" id="color" class="form-control" [(ngModel)]="localStore.color">

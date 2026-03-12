@@ -1,60 +1,26 @@
-import { effect, inject, Injectable, Injector, signal, CreateEffectOptions, assertInInjectionContext, makeEnvironmentProviders } from '@angular/core';
-import { attachToSignal, isStorageVarSignal, StandaloneStorageVarOptions, STATELY_OPTIONS, StorageVarSignal } from '../util/util';
+import { effect, inject, Injectable, signal, assertInInjectionContext, makeEnvironmentProviders, linkedSignal, Injector } from '@angular/core';
+import { attachToSignal, DetailedError, MultiKeyMap, StandaloneStorageVarOptions, StorageVarRootSignal, StorageVarSignal } from '../util/util';
 import { deserialize, serialize } from '../util/serialization';
 import { Constructor } from 'type-fest';
 
-type StorageRecord<T extends string = string> = Record<T, Storage>;
-
-// export const STORAGE_RECORD = new InjectionToken<StorageRecord>('STORAGE_RECORD');
-
-type GetSetter = (<T>(key: string, ctor?: Constructor<T>) => T) & { set<T>(key: string, value: T): void; };
-
-export function provideStately(options?: { statelyService?: Constructor<StatelyService> }) {
-  options ||= {};
-  options.statelyService ||= DefaultStatelyService;
-  return makeEnvironmentProviders([
-    { provide: StatelyService, useClass: options.statelyService },
-  ]);
-}
-
-export function statelyStorage(name: string, storage: Storage, statelyService?: StatelyService) {
-  const service = statelyService || inject(StatelyService);
-  return StatelyService.prototype.registerStorage.call(service, name, storage);
+export function provideStately() {
+  return makeEnvironmentProviders([ StatelyService ]);
 }
 
 @Injectable()
 export class StatelyService {
   private injector = inject(Injector);
-  private storages = {} as StorageRecord;
-  private storageNames = new Map<Storage, string>();
-  signals = {} as Record<string, Record<string, StorageVarSignal<unknown>>>;
+  rootSignals = new MultiKeyMap<Storage | 'mem', string, StorageVarRootSignal<unknown>>();
 
-  registerStorage(name: string, storage: Storage) {
-    this.signals[name] = {};
-    this.storages[name] = storage;
-
-    // add storage to storage name lookup
-    this.storageNames.set(this.storages[name], name);
-
-    // set up getter setter
-    const getterSetter = function(this: StatelyService, key: string, ctor?: Constructor<unknown>) {
-      return this.getOrCreateSignal(name, key, { ctor })();
-    } as GetSetter;
-    getterSetter.set = (key: string, value: unknown) => {
-      this.getOrCreateSignal(name, key, { force: true }).set(value);
-    };
-
-    return getterSetter;
-  }
-
-  private getOrCreateSignal(storageName: string, key: string, options: { default?: unknown; ctor?: Constructor<unknown>; force?: boolean }) {
-    if (this.signals[storageName][key] == null) {
-      const storage = this.storages[storageName];
-      const varOptions: StandaloneStorageVarOptions<unknown> = {
+  private getOrCreateRootSignal(storage: Storage, key: string, options: { default?: unknown; ctor?: Constructor<unknown> }) {
+    const existing = this.rootSignals.get(storage, key);
+    if (existing == null) {
+      const varOptions: StandaloneStorageVarOptions<unknown> & { root: true } = {
         default: options.default,
         initialized: false,
         key,
         storage,
+        root: true,
       };
       // retrieve value from storage
       let value: unknown = storage.getItem(key);
@@ -62,57 +28,46 @@ export class StatelyService {
       value = value != null
         ? deserialize(
             value,
-            options.ctor || null,
+            options.ctor ?? (options.default as { constructor?: Constructor<unknown> } | undefined)?.constructor ?? null,
             key,
           )
         : varOptions.default
       ;
       // create signal and attach stately options
-      const signal$ = signal(value, varOptions);
-      const varSignal = attachToSignal(signal$, varOptions);
-      // register with stately service
-      this.register(varSignal, options.force);
+      const equal = varOptions.equal || Object.is;
+      const signal$ = signal({ value, source: 'default' }, { ...varOptions, equal: (a, b) => equal(a.value, b.value) });
+      const varSignal = attachToSignal(signal$, varOptions) as StorageVarRootSignal<unknown>;
       // store signal for future lookups
-      this.signals[storageName][key] = varSignal;
+      this.rootSignals.set(storage, key, varSignal);
+      effect(() => {
+        const val = varSignal();
+        if (val.source !== 'default') {
+          storage.setItem(key, serialize(val.value));
+        }
+      }, { injector: this.injector }); // pass service injector so effect gets cleaned up in service OnDestroy
       return varSignal;
     }
-    return this.signals[storageName][key];
+    return existing;
   }
 
-  public getStorageName(storage: Storage) {
-    return this.storageNames.get(storage) || null;
-  }
+  public createLinked<T>(options: StandaloneStorageVarOptions<T | undefined>): StorageVarSignal<T | undefined> {
+    assertInInjectionContext(StatelyService.prototype.createLinked);
 
-  public register = (signalToRegister: StorageVarSignal<any>, force?: boolean) => {
-    if (isStorageVarSignal(signalToRegister) && !signalToRegister[STATELY_OPTIONS].initialized) {
-      const options = signalToRegister[STATELY_OPTIONS];
-
-      const effectOptions: CreateEffectOptions = {};
-      try {
-        assertInInjectionContext(StatelyService.prototype.register);
-      } catch {
-        effectOptions.injector = this.injector;
-      }
-
-      let firstCheck = !force;
-      effect(() => {
-        const value = signalToRegister();
-        if (!firstCheck) { // don't update on first
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-          options.storage!.setItem(options.key, serialize(value));
-        } else {
-          firstCheck = false;
-        }
-      }, effectOptions);
-      options.initialized = true;
+    if (!options.storage) {
+      throw new DetailedError('Invalid value for options.storage', { value: options.storage });
     }
-  };
-}
 
-@Injectable()
-export class DefaultStatelyService extends StatelyService {
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  session = statelyStorage('session', sessionStorage, this)!;
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-  local = statelyStorage('local', localStorage, this)!;
+    const rootSignal = this.getOrCreateRootSignal(options.storage, options.key, options);
+    const signal$ = linkedSignal<T | undefined>(() => rootSignal().value as T | undefined, {
+      equal: options.equal,
+      debugName: options.debugName,
+    });
+    // ToDo fix type
+    const varSignal = attachToSignal<T | undefined>(signal$ as any, options);
+    effect(() => {
+      const val = varSignal();
+      rootSignal.set({ value: val, source: 'linked' });
+    });
+    return varSignal;
+  };
 }
